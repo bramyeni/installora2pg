@@ -1,7 +1,7 @@
 ﻿# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# $Id: installora2pg.ps1 32 2020-09-01 23:11:39Z bpahlawa $
-# $Date: 2020-09-02 07:11:39 +0800 (Wed, 02 Sep 2020) $
-# $Revision: 32 $
+# $Id: installora2pg.ps1 53 2021-06-08 16:28:43Z bpahlawa $
+# $Date: 2021-06-09 00:28:43 +0800 (Wed, 09 Jun 2021) $
+# $Revision: 53 $
 # $Author: bpahlawa $
 # 
 
@@ -75,8 +75,11 @@ Function Download-File {
 
   # Display message of downloading file
   Write-OutputAndLog "Downloading $name client..."
-  $RetVal = Invoke-WebRequest $url -usebasicparsing -outfile "$global:ora2pg\temp\$name"
-  if ( $Retval.StatusCode -eq 200 )
+  create-dir  "$global:ora2pg\temp"
+  $RetVal = Invoke-WebRequest $url -usebasicparsing -outfile "$global:ora2pg\temp\$name" | select-object StatusCode
+
+
+  if ( $Retval.StatusCode -eq 200 -or $Retval -eq $null )
   {
      Write-OutputAndLog "Url '$url' has been downloaded into '$global:ora2pg\temp\$name'"
   }
