@@ -1,9 +1,9 @@
 #!/bin/bash
-# $Id: installora2pg.sh 347 2020-09-22 09:18:37Z bpahlawa $
+# $Id: installora2pg.sh 453 2022-05-24 06:42:16Z bpahlawa $
 # Created 20-AUG-2019
 # $Author: bpahlawa $
-# $Date: 2020-09-22 17:18:37 +0800 (Tue, 22 Sep 2020) $
-# $Revision: 347 $
+# $Date: 2022-05-24 14:42:16 +0800 (Tue, 24 May 2022) $
+# $Revision: 453 $
 
 #url basic and sdk instantclient for oracle 19c now doesnt require to accept license agreement
 ORAINSTBASICURL="https://download.oracle.com/otn_software/linux/instantclient/19800/instantclient-basic-linux.x64-19.8.0.0.0dbru.zip?xd_co_f=27c74c5ade0e8f3e1141595923378611"
@@ -892,6 +892,7 @@ install_oracle_instantclient()
          export ORACLE_HOME="${LIBFILE%/*/*}"
       fi
    fi
+   [[ "$ORACLE_HOME" != "" ]] && ln -s "$ORACLE_HOME/libclntshcore.so.19.1" "$ORACLE_HOME/libclntshcore.so"
    install_additional_libs
    install_dbd_oracle
    [[ "$ORA2PGBIN" = "1" ]] && PGSQLCLIENT=~/.pgsqlclient && mkdir $PGSQLCLIENT && build_pgsql $PGSQLCLIENT || install_pgsqlclient
