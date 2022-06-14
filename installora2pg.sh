@@ -1,9 +1,9 @@
 #!/bin/bash
-# $Id: installora2pg.sh 453 2022-05-24 06:42:16Z bpahlawa $
+# $Id: installora2pg.sh 456 2022-06-14 22:34:44Z bpahlawa $
 # Created 20-AUG-2019
 # $Author: bpahlawa $
-# $Date: 2022-05-24 14:42:16 +0800 (Tue, 24 May 2022) $
-# $Revision: 453 $
+# $Date: 2022-06-15 10:34:44 +1200 (Wed, 15 Jun 2022) $
+# $Revision: 456 $
 
 #url basic and sdk instantclient for oracle 19c now doesnt require to accept license agreement
 ORAINSTBASICURL="https://download.oracle.com/otn_software/linux/instantclient/19800/instantclient-basic-linux.x64-19.8.0.0.0dbru.zip?xd_co_f=27c74c5ade0e8f3e1141595923378611"
@@ -551,9 +551,9 @@ copy_reqlib()
 {
    local LIBDIR="$1"
    local TARGETDIR="$2"
-   GLIBCVER=`find /usr/lib /usr/lib64 /lib /lib64 -name "libc.so.6" -exec readlink -f {} \; | awk -F / '{print $NF}' | sed 's/.*\-\([0-9\.]\+\)\..*/\1/g' 2>/dev/null`
+   GLIBCVER=`find /usr/lib /usr/lib64 /lib /lib64 -name "libc.so.6" -exec readlink -f {} \; | awk -F / '{print $NF}' | tail -1 | sed 's/.*\-\([0-9\.]\+\)\..*/\1/g' 2>/dev/null`
 
-   echo -e "${BLUEFONT}Copying required libraries to $TARGETDIR ${NORMALFONT}"
+   echo -e "${BLUEFONT}Copying required libraries from $LIBDIR to $TARGETDIR ${NORMALFONT}"
    find $LIBDIR -type f -exec ldd {} \; 2>/dev/null | grep -Ev "not a dynamic|not regular file|statically linked|Not a valid|not found" | egrep -v "\-vdso|ld\-|libdl\-|libdl.so|librt.so|librt\-|thread|libc.so" |  awk '{print $(NF-1)}' | sort | uniq > $TMPFILE
    local CURRDIR=`pwd`
    while read -r DEPLIB
@@ -652,7 +652,7 @@ build_ora2pg_binary()
        DIRLIBPERL=`dirname $LIBPERL`
        cd $DIRLIBPERL
        ln -s $LIBPERL libperl.so 2>/dev/null
-       copy_reqlib $DIRLIBPERL/libperl.so $SMALLORA2PG
+       copy_reqlib "$DIRLIBPERL/libperl.so" $SMALLORA2PG
        ORA2PGCONFFILE=`find /etc/ora2pg -name "ora2pg*conf*" 2>/dev/null`
    fi
    [[ "$ORA2PGCONFFILE" != "" ]] && cp $ORA2PGCONFFILE $SMALLORA2PG
@@ -662,19 +662,23 @@ build_ora2pg_binary()
    perl -MCPAN -e 'install PAR::Packer'
 
    ORA2PGFILE=`find $DIRTOSEARCH -name "ora2pg" 2>/dev/null | tail -1 2>/dev/null`
+   ORA2PGSCANNERFILE=`find $DIRTOSEARCH -name "ora2pg_scanner" 2>/dev/null | tail -1 2>/dev/null`
    [[ "$ORA2PGFILE" = "" ]] && echo -e "${REDFONT}Can not find ora2pg script...exiting.... ${NORMALFONT}" && exit 1
 
    cp $ORA2PGFILE /tmp
+   cp $ORA2PGSCANNERFILE /tmp
    sed -i "s/\(.*CONFIG_FILE = \)\".*\(ora2pg.conf\)/\1\"ora2pg.conf/g" /tmp/ora2pg
    pp -o $SMALLORA2PG/ora2pg /tmp/ora2pg
    [[ $? -ne 0 ]] && echo "${REDFONT}Unable to convert ora2pg script to a binary file...exiting...${NORMALFONT}" && exit 1
-   rm -f /tmp/ora2pg
+   pp -o $SMALLORA2PG/ora2pg_scanner /tmp/ora2pg_scanner
+   [[ $? -ne 0 ]] && echo "${REDFONT}Unable to convert ora2pg_scanner script to a binary file...exiting...${NORMALFONT}" && exit 1
+   rm -f /tmp/ora2pg_scanner
    
    PGSQLDEPLIBS=`find $DIRTOSEARCH -name "Pg.so" 2>/dev/null | tail -1 2>/dev/null`
    ORACLEDEPLIBS=`find $DIRTOSEARCH -name "Oracle.so" 2>/dev/null | tail -1 2>/dev/null`
-   copy_reqlib $PGSQLDEPLIBS $SMALLORA2PG
-   copy_reqlib $ORACLEDEPLIBS $SMALLORA2PG
-   copy_reqlib $ORACLE_HOME/genezi $SMALLORA2PG
+   copy_reqlib "$PGSQLDEPLIBS" $SMALLORA2PG
+   copy_reqlib "$ORACLEDEPLIBS" $SMALLORA2PG
+   copy_reqlib "$ORACLE_HOME/genezi" $SMALLORA2PG
    cp $ORACLE_HOME/*oci*.so $SMALLORA2PG
    echo -e "${BLUEFONT}Gzipping $SMALLORA2PG into $(pwd)/smallora2pg.tar.gz${NORMALFONT}"
    cd $SMALLORA2PG
@@ -685,7 +689,7 @@ build_ora2pg_binary()
 CURRDIR=\`pwd\`
 BUILTGLIBCVER=$GLIBCVER
 [[ \"\$USER\" != \"root\" && \"\$USER\" != \"\" ]] && echo \"root is needed to extract this package....exiting...\" && exit 1
-THISGLIBC=\`find /usr/lib /usr/lib64 /lib /lib64 -name \"libc.so.6\" -exec readlink -f {} \\; | awk -F / '{print \$NF}' | sed 's/.*\-\\([0-9\.]\\+\\)\\..*/\\\\1/g'\`
+THISGLIBC=\`find /usr/lib /usr/lib64 /lib /lib64 -name \"libc.so.6\" -exec readlink -f {} \\; | awk -F / '{print \$NF}' | tail -1 | sed 's/.*\-\\([0-9\.]\\+\\)\\..*/\\\\1/g'\`
 VER=\`echo \"\$BUILTGLIBCVER \$THISGLIBC\" | awk '{printf(\"%%d\",\$1-\$2<=0?0:1)}'\`
 [[ \$VER -gt 0 ]] && echo \"This package required GLIBC version >= \$BUILTGLIBCVER, this system has GLIBC version \$THISGLIBC\" && exit 1
 PAYLOAD_LINE=\`awk '/^__PAYLOAD_BELOW__/ {print NR + 1; exit 0; }' \$CURRDIR/\$0\`
@@ -700,12 +704,17 @@ do
     id \$THEUSER 2>/dev/null
 done
 HOMEDIR=\`grep \"\$THEUSER:\" /etc/passwd | cut -f6 -d:\`
-[[ ! -d \$HOMEDIR/ora2pg ]] && mkdir -p \$HOMEDIR/ora2pg && chown -R \$THEUSER \$HOMEDIR
+[[ ! -d \$HOMEDIR/ora2pg ]] && mkdir -p \$HOMEDIR/ora2pg
 tail -n+\$PAYLOAD_LINE \$CURRDIR/\$0 | tar -xvz -C \$HOMEDIR/ora2pg
+chown -R \$THEUSER \$HOMEDIR
 printf \"
 export PATH=\\\\\"\$HOMEDIR/ora2pg\\\${PATH:+:\\\$PATH}\\\\\"
 export LD_LIBRARY_PATH=\$HOMEDIR/ora2pg\\\\n\" > \$HOMEDIR/.bash_profile
 ln -sf \$HOMEDIR/.bash_profile \$HOMEDIR/.profile
+sed -i \"s|^\(ORACLE_HOME\).*|\\\1	 \$HOMEDIR/ora2pg|g\" \$HOMEDIR/ora2pg/ora2pg.conf.dist
+echo -e \"#create assessment report in html format\n./ora2pg -c \$HOMEDIR/ora2pg/ora2pg.conf.dist -t SHOW_REPORT -n SCHEMA_NAME --estimate_cost --dump_as_html\" > \$HOMEDIR/ora2pg/sample.txt
+echo -e \"#create assessment report in csv format\n./ora2pg -c \$HOMEDIR/ora2pg/ora2pg.conf.dist -t SHOW_REPORT -n SCHEMA_NAME --estimate_cost --dump_as_csv\" >> \$HOMEDIR/ora2pg/sample.txt
+echo -e \"#create migration scripts\n./ora2pg -c \$HOMEDIR/ora2pg/ora2pg.conf.dist -n SCHEMA_NAME\" >> \$HOMEDIR/ora2pg/sample.txt
 exit 0
 __PAYLOAD_BELOW__\n" > smallora2pg.bin
    chmod ugo+rx smallora2pg.bin
@@ -731,12 +740,13 @@ install_ora2pg_locally()
 
 
    [[ `find $PREFIX -name "Oracle.so" | wc -l` -eq 0 ]] && perl -MCPAN -e 'install DBD' && perl -MCPAN -e 'install DBD::Oracle'
-   [[ `find $PREFIX -name "Pg.so" | wc -l` -eq 0 ]] && perl -MCPAN -e 'install DBD::Pg'
    [[ ! -f $PREFIX/bin/pg_config ]] && build_pgsql
    [[ ! -d $PREFIX/etc ]] && mkdir -p $PREFIX/etc
+   [[ ! -d $PREFIX/include ]] && mkdir -p $PREFIX/include
+   [[ `find $PREFIX -name "Pg.so" | wc -l` -eq 0 ]] && perl -MCPAN -e 'install DBD::Pg'
    [[ `find $PREFIX -name "ora2pg" | wc -l` -eq 0 ]] && install_ora2pg $PREFIX/etc
    echo -e "${BLUEFONT}Copying required libraries ....${NORMALFONT}"
-   copy_reqlib $PREFIX $PREFIX/lib
+   copy_reqlib "$PREFIX" $PREFIX/lib
    echo -e "${BLUEFONT}Removing duplicate libraries on $PREFIX/lib which already available on $ORACLE_HOME....${NORMALFONT}"
    remove_duplicate_libs $ORACLE_HOME $PREFIX/lib
    echo -e "${BLUEFONT}Gzipping $PREFIX into $(pwd)/localora2pg.tar.gz${NORMALFONT}"
@@ -746,7 +756,7 @@ install_ora2pg_locally()
 CURRDIR=\`pwd\`
 BUILTGLIBCVER=$GLIBCVER
 [[ \"\$USER\" != \"root\" && \"\$USER\" != \"\" ]] && echo \"root is needed to extract this package....exiting...\" && exit 1
-THISGLIBC=\`find /usr/lib /usr/lib64 /lib /lib64 -name \"libc.so.6\" -exec readlink -f {} \\; | awk -F / '{print \$NF}' | sed 's/.*\-\\([0-9\.]\\+\\)\\..*/\\\\1/g'\`
+THISGLIBC=\`find /usr/lib /usr/lib64 /lib /lib64 -name \"libc.so.6\" -exec readlink -f {} \\; | awk -F / '{print \$NF}' | tail -1 | sed 's/.*\-\\([0-9\.]\\+\\)\\..*/\\\\1/g'\`
 VER=\`echo \"\$BUILTGLIBCVER \$THISGLIBC\" | awk '{printf(\"%%d\",\$1-\$2<=0?0:1)}'\`
 [[ \$VER -gt 0 ]] && echo \"This package required GLIBC version >= \$BUILTGLIBCVER, this system has GLIBC version \$THISGLIBC\" && exit 1
 PAYLOAD_LINE=\`awk '/^__PAYLOAD_BELOW__/ {print NR + 1; exit 0; }' \$CURRDIR/\$0\`
@@ -763,7 +773,8 @@ do
     id \$THEUSER 2>/dev/null
 done
 HOMEDIR=\`grep \"\$THEUSER:\" /etc/passwd | cut -f6 -d:\`
-[[ ! -d \$HOMEDIR ]] && mkdir \$HOMEDIR && chown \$THEUSER \$HOMEDIR
+[[ ! -d \$HOMEDIR ]] && mkdir \$HOMEDIR 
+chown -R \$THEUSER \$HOMEDIR
 printf \"export PERL_BASE=\\\\\"$PREFIX\\\\\"
 export PATH=\\\\\"\\\$PERL_BASE/bin\\\${PATH:+:\\\$PATH}\\\\\"
 export MANPATH=\\\\\"\\\$PERL_BASE/man\\\${MANPATH:+:\\\$MANPATH}\\\\\"
@@ -771,6 +782,10 @@ export ORACLE_HOME=\\\\\"$ORACLE_HOME\\\\\"
 export LD_LIBRARY_PATH=\\\$PERL_BASE/lib:\\\$ORACLE_HOME
 export POSTGRES_HOME=\\\\\"\\\$PERL_BASE\\\\\"\\\\n\" > \$HOMEDIR/.bash_profile
 ln -sf \$HOMEDIR/.bash_profile \$HOMEDIR/.profile
+sed -i \"s|^\(ORACLE_HOME\).*|\\\1	 $ORACLE_HOME|g\" $PREFIX/etc/ora2pg.conf.dist
+echo -e \"#create assessment report in html format\n./bin/ora2pg -c ./etc/ora2pg.conf.dist -t SHOW_REPORT -n SCHEMA_NAME --estimate_cost --dump_as_html\" > $PREFIX/sample.txt
+echo -e \"#create assessment report in csv format\n./bin/ora2pg -c ./etc/ora2pg.conf.dist -t SHOW_REPORT -n SCHEMA_NAME --estimate_cost --dump_as_csv\" >> $PREFIX/sample.txt
+echo -e \"#create migration scripts\n./bin/ora2pg -c ./etc/ora2pg.conf.dist -n SCHEMA_NAME\" >> $PREFIX/sample.txt
 chown -R \$THEUSER $PREFIX
 exit 0
 __PAYLOAD_BELOW__\n" > localora2pg.bin
@@ -892,7 +907,13 @@ install_oracle_instantclient()
          export ORACLE_HOME="${LIBFILE%/*/*}"
       fi
    fi
-   [[ "$ORACLE_HOME" != "" ]] && ln -s "$ORACLE_HOME/libclntshcore.so.19.1" "$ORACLE_HOME/libclntshcore.so"
+   if [ "$ORACLE_HOME" != "" ]
+   then
+      CURRDIR=`pwd`
+      cd $ORACLE_HOME
+      [[ -f libclntshcore.so.19.1 ]] && ln -s libclntshcore.so.19.1 libclntshcore.so
+      cd $CURRDIR
+   fi
    install_additional_libs
    install_dbd_oracle
    [[ "$ORA2PGBIN" = "1" ]] && PGSQLCLIENT=~/.pgsqlclient && mkdir $PGSQLCLIENT && build_pgsql $PGSQLCLIENT || install_pgsqlclient
