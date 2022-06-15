@@ -1,7 +1,7 @@
 ﻿# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# $Id: installora2pg.ps1 53 2021-06-08 16:28:43Z bpahlawa $
-# $Date: 2021-06-09 00:28:43 +0800 (Wed, 09 Jun 2021) $
-# $Revision: 53 $
+# $Id: installora2pg.ps1 58 2022-06-15 00:18:43Z bpahlawa $
+# $Date: 2022-06-15 12:18:43 +1200 (Wed, 15 Jun 2022) $
+# $Revision: 58 $
 # $Author: bpahlawa $
 # 
 
@@ -238,22 +238,22 @@ Function Install-FromMsi {
        Write-OutputAndLog "File $InstallerPath has been downloaded..." 
     }
 
+
     # add necessary arguments to install quietly
-
-    
-
-    $args = @('/i',"`"$installerPath`"", '/quiet', '/qn','/passive','/log c:\windows\temp\installperl.log');
+    $args = @('/i',"`"$installerPath`"", '/quiet', '/qn','/passive','/lx c:\windows\temp\installperl.log');
     $args += $options;
 
-    # check whether perl has been installed
-    $thefile = Get-ChildItem -LiteralPath $Global:ora2pg -Filter perl.exe -Recurse -force -ErrorAction SilentlyContinue
 
-    if ( $thefile.Fullname -ne $null )
+    # check whether perl has been installed
+ 
+    Write-OutputAndLog ('Getting {0} package information...' -f $name)
+    $thepkg=Get-WmiObject -Class Win32_Product | Where-Object Name -Match ".*$name.*"
+
+
+    if ( $thepkg.Name -ne $null)
     {
-       Write-OutputAndLog ('Uninstalling {0} ...' -f $name);
-       Write-OutputAndLog ("msiexec /uninstall '$installerPath' /passive /norestart");
-       $argsu = @('/uninstall',"`"$installerPath`"", '/passive','/norestart');
-       Start-process msiexec -wait -ArgumentList $argsu  
+        Write-OutputAndLog ('Uninstalling {0} ...' -f $thepkg.Name)
+        $thepkg.uninstall()
     }
 
     # display message
@@ -262,6 +262,7 @@ Function Install-FromMsi {
 
     # execute installation
     Start-Process msiexec -Wait -ArgumentList $args;
+
 
     #  Update path
     $env:PATH = [Environment]::GetEnvironmentVariable('PATH', [EnvironmentVariableTarget]::Machine);
@@ -273,6 +274,7 @@ Function Install-FromMsi {
         Write-OutputAndLog $verifyCommand;
         Invoke-Expression $verifyCommand;
     }
+
 
     # remove the installation file
     Write-OutputAndLog ('Removing {0} installer ...' -f $name);
