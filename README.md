@@ -2,6 +2,9 @@
 
 ## Brief Description
 Installing ora2pg is not really straight forward as it requires many perl libraries and source codes, therefore the automated script was created to overcome this problem
+
+the linux bash script is located here: https://github.com/bramyeni/bramscripts/blob/main/microsoft/installora2pg.sh
+
 There are 2 type of scripts have been created:
 1.	installora2pg.ps1
 This is an automated script to install ora2pg on windows environment
